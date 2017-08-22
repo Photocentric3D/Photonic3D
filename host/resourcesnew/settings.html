@@ -100,7 +100,11 @@
 					<div class="list-group-item">
 						<i class="fa fa-2x fa-plug pull-left"></i>
 						<h4>Access Point</h4>
-						<select name="type" id="AccessPoint" class="form-control" ng-model="settingsController.selectedNetworkInterface" ng-options="item.ssid group by item.parentInterfaceName for item in settingsController.networkInterfaces|filter:{hidden: 'false'}"	required>
+
+						<select name="type" id="AccessPoint" class="form-control"
+							ng-model="settingsController.selectedNetworkInterface" 
+							ng-options="item.ssid group by item.parentInterfaceName for item in settingsController.networkInterfaces|filter:{hidden: 'false'}"
+							required>
 						  <option value="">{{settingsController.loadingNetworksMessage}}</option>
 					</div>
 					<div class="list-group-item">
@@ -134,6 +138,14 @@
 				<span ng-include="'editGCodeTemplates.html'" ng-show="showAdvanced==true"></span>
 				<span ng-include="'editCalculators.html'" ng-show="showAdvanced==true"></span>
 				<span ng-include="'advancedProperties.html'" ng-show="showAdvanced==true"></span>
+			</div>
+		</div>
+	</div>
+	
+	<div class="modal fade" id="graphScript" tabindex="-1" role="dialog" aria-labelledby="editModal" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<span ng-include="'graphScript.html'"></span>
 			</div>
 		</div>
 	</div>

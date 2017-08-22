@@ -1,6 +1,5 @@
 package org.area515.resinprinter.server;
 
-import java.awt.GraphicsDevice;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -12,7 +11,9 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,6 +36,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.area515.resinprinter.display.AlreadyAssignedException;
+import org.area515.resinprinter.display.GraphicsOutputInterface;
 import org.area515.resinprinter.display.InappropriateDeviceException;
 import org.area515.resinprinter.job.PrintFileProcessor;
 import org.area515.resinprinter.network.LinuxNetworkManager;
@@ -75,16 +77,14 @@ public class HostProperties {
 	private File printDir;
 	private String hostGUI;
 	private boolean fakeSerial = false;
-	private boolean fakedisplay = false;
-	private boolean customPhotocentricDisplay = true;
 	private boolean removeJobOnCompletion = true;
 	private boolean forceCalibrationOnFirstUse = false;
 	private boolean limitLiveStreamToOneCPU = false;
 	private ConcurrentHashMap<String, PrinterConfiguration> configurations;
-	private List<Class<Feature>> featureClasses = new ArrayList<Class<Feature>>();
+	private Map<Class<Feature>, String> featureClasses = new HashMap<Class<Feature>, String>();
 	private List<Class<Notifier>> notificationClasses = new ArrayList<Class<Notifier>>();
 	private List<PrintFileProcessor> printFileProcessors = new ArrayList<PrintFileProcessor>();
-	private List<GraphicsDevice> displayDevices = new ArrayList<GraphicsDevice>();
+	private List<GraphicsOutputInterface> displayDevices = new ArrayList<GraphicsOutputInterface>();
 	private Class<SerialCommunicationsPort> serialPortClass;
 	private Class<NetworkManager> networkManagerClass;
 	
@@ -190,8 +190,6 @@ public class HostProperties {
 		uploadDirString = configurationProperties.getProperty("uploaddir");
 		
 		fakeSerial = new Boolean(configurationProperties.getProperty("fakeserial", "false"));
-		fakedisplay = new Boolean(configurationProperties.getProperty("fakedisplay", "false"));
-		customPhotocentricDisplay = new Boolean(configurationProperties.getProperty("customPhotocentricDisplay", "true"));
 		hostGUI = configurationProperties.getProperty("hostGUI", "resources");
 		visibleCards = Arrays.asList(configurationProperties.getProperty("visibleCards", "printers,printJobs,printables,users,settings").split(","));
 		
@@ -202,8 +200,8 @@ public class HostProperties {
 				currentPropertyString = currentPropertyString.replace("feature.", "");
 				if ("true".equalsIgnoreCase(currentProperty.getValue() + "")) {
 					try {
-						featureClasses.add((Class<Feature>)Class.forName(currentPropertyString));
-					} catch (UnsatisfiedLinkError | ClassNotFoundException e) {
+						featureClasses.put((Class<Feature>)Class.forName(currentPropertyString), configurationProperties.getProperty("featureSettings." + currentPropertyString));
+					} catch (NoClassDefFoundError | UnsatisfiedLinkError | ClassNotFoundException e) {
 						logger.error("Failed to load Feature:" + currentPropertyString, e);
 					}
 				}
@@ -218,7 +216,7 @@ public class HostProperties {
 				if ("true".equalsIgnoreCase(currentProperty.getValue() + "")) {
 					try {
 						notificationClasses.add((Class<Notifier>)Class.forName(currentPropertyString));
-					} catch (UnsatisfiedLinkError | ClassNotFoundException e) {
+					} catch (NoClassDefFoundError | UnsatisfiedLinkError | ClassNotFoundException e) {
 						logger.error("Failed to load Notifier:" + currentPropertyString, e);
 					}
 				}
@@ -234,7 +232,7 @@ public class HostProperties {
 					try {
 						PrintFileProcessor processor = ((Class<PrintFileProcessor>)Class.forName(currentPropertyString)).newInstance();
 						printFileProcessors.add(processor);
-					} catch (UnsatisfiedLinkError | ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+					} catch (NoClassDefFoundError | UnsatisfiedLinkError | ClassNotFoundException | InstantiationException | IllegalAccessException e) {
 						logger.error("Failed to load PrintFileProcessor:" + currentPropertyString, e);
 					}
 				}
@@ -248,9 +246,9 @@ public class HostProperties {
 				currentPropertyString = currentPropertyString.replace("displayDevice.", "");
 				if ("true".equalsIgnoreCase(currentProperty.getValue() + "")) {
 					try {
-						GraphicsDevice device = ((Class<GraphicsDevice>)Class.forName(currentPropertyString)).newInstance();
+						GraphicsOutputInterface device = ((Class<GraphicsOutputInterface>)Class.forName(currentPropertyString)).newInstance();
 						displayDevices.add(device);
-					} catch (UnsatisfiedLinkError | ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+					} catch (NoClassDefFoundError | UnsatisfiedLinkError | ClassNotFoundException | InstantiationException | IllegalAccessException e) {
 						logger.error("Failed to load DisplayDevice:" + currentPropertyString, e);
 					}
 				}
@@ -277,7 +275,7 @@ public class HostProperties {
 		try {
 			userManagementFeature = configurationProperties.getProperty("UserManagementFeatureImplementation", KeystoreLoginService.class.getName());
 			Class<Feature> userManagementFeatureClass = (Class<Feature>)Class.forName(userManagementFeature);
-			featureClasses.add(userManagementFeatureClass);
+			featureClasses.put(userManagementFeatureClass, configurationProperties.getProperty("featureSettings." + userManagementFeatureClass.getName()));
 		} catch (ClassNotFoundException e) {
 			logger.error("Failed to load UserManagementFeatureImplementation:{}", userManagementFeature);
 		}
@@ -489,10 +487,6 @@ public class HostProperties {
 		return fakeSerial;
 	}
 	
-	public boolean getFakeDisplay(){
-		return fakedisplay;
-	}
-
 	public String getSSLKeypairPassword() {
 		return sslKeypairPassword;
 	}
@@ -521,7 +515,7 @@ public class HostProperties {
 		return networkManagerClass;
 	}
 	
-	public List<Class<Feature>> getFeatures() {
+	public Map<Class<Feature>, String> getFeatures() {
 		return featureClasses;
 	}
 	
@@ -533,7 +527,7 @@ public class HostProperties {
 		return printFileProcessors;
 	}
 	
-	public List<GraphicsDevice> getDisplayDevices() {
+	public List<GraphicsOutputInterface> getDisplayDevices() {
 		return displayDevices;
 	}
 	
@@ -599,19 +593,10 @@ public class HostProperties {
 	}
 	
 	public HostInformation loadHostInformation() {
-		Class<NetworkManager> managerClass = HostProperties.Instance().getNetworkManagerClass();
-		String deviceName = "Daylight Resin Printer";
-		try{
-			NetworkManager networkManager = managerClass.newInstance();
-            		deviceName = networkManager.getHostname();
-		}
-		catch (InstantiationException | IllegalAccessException e) {
-            		logger.error("Error retrieving network host configuration", e);
-		}
 		Properties configurationProperties = getMergedProperties();
 		HostInformation settings = new HostInformation(
-				configurationProperties.getProperty("deviceName", deviceName),
-				configurationProperties.getProperty("manufacturer", "Photocentric3D"));
+				configurationProperties.getProperty("deviceName", "Photonic 3D Multiprint Host"),
+				configurationProperties.getProperty("manufacturer", "Wes Gilster"));
 		return settings;
 	}
 	
